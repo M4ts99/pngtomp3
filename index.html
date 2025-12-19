@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Universal Media Transformer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --accent: #bb86fc; --bg: #0f0f0f; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        
+        /* Die Dropzone ist jetzt ein Label -> Klick öffnet automatisch den Input */
+        .drop-zone { 
+            border: 2px dashed #333; 
+            padding: 50px; 
+            border-radius: 20px; 
+            text-align: center; 
+            width: 400px; 
+            transition: 0.3s; 
+            background: #1a1a1a; 
+            display: block; 
+            cursor: pointer;
+        }
+        .drop-zone:hover { border-color: var(--accent); background: #222; }
+        
+        input[type="file"] { display: none; }
+        
+        .btn-group { margin-top: 20px; display: flex; gap: 10px; justify-content: center; }
+        
+        .btn { background: var(--accent); color: black; padding: 15px 30px; border-radius: 30px; border: none; font-weight: bold; cursor: pointer; font-size: 1em; }
+        .btn-download { background: #03dac6; display: none; text-decoration: none; color: black; line-height: 1.2; padding: 15px 30px; border-radius: 30px; font-weight: bold; }
+        
+        .result { margin-top: 30px; width: 100%; max-width: 500px; text-align: center; }
+        img { max-width: 100%; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .info { color: var(--accent); margin-bottom: 15px; font-weight: bold; }
+        audio { width: 100%; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>Universal <span>Transformer</span></h1>
+    <p style="color: #888; margin-bottom: 30px;">Audio → Bild | Bild → Audio</p>
+
+    <label class="drop-zone" id="dropZone" for="fileInput">
+        <div id="fileInfo">Datei hierher ziehen oder klicken</div>
+        <input type="file" id="fileInput">
+    </label>
+
+    <div class="btn-group">
+        <button class="btn" id="startBtn">TRANSFORMIEREN</button>
+        <a href="#" id="downloadBtn" class="btn-download" download>SPEICHERN</a>
+    </div>
+
+    <div class="result" id="resultArea"></div>
+
+    <script>
+        const input = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const btn = document.getElementById('startBtn');
+        const dlBtn = document.getElementById('downloadBtn');
+        const result = document.getElementById('resultArea');
+
+        // Zeige den Dateinamen an, wenn ausgewählt
+        input.onchange = () => {
+            if(input.files[0]) {
+                fileInfo.innerHTML = `<strong>Ausgewählt:</strong><br>${input.files[0].name}`;
+                fileInfo.style.color = "#bb86fc";
+            }
+        };
+
+        btn.onclick = async () => {
+            if(!input.files[0]) return alert("Bitte wähle erst eine Datei aus!");
+            
+            result.innerHTML = "<em>Die Magie arbeitet...</em>";
+            dlBtn.style.display = "none";
+
+            const formData = new FormData();
+            formData.append("file", input.files[0]);
+
+            try {
+                const res = await fetch("/process", { method: "POST", body: formData });
+                const data = await res.json();
+
+                if(data.error) throw new Error(data.error);
+
+                // Timestamp gegen Browser-Caching
+                const finalUrl = `${data.url}?t=${Date.now()}`;
+
+                if(data.type === "image") {
+                    result.innerHTML = `<div class="info">${data.msg}</div><img src="${finalUrl}">`;
+                } else {
+                    result.innerHTML = `<div class="info">${data.msg}</div><audio controls autoplay src="${finalUrl}"></audio>`;
+                }
+
+                // Download-Button aktivieren
+                dlBtn.href = data.url;
+                dlBtn.style.display = "inline-block";
+                // Dateiname für den Download setzen
+                dlBtn.setAttribute("download", data.url.split('/').pop());
+
+            } catch (err) {
+                result.innerHTML = `<span style="color:red">Fehler: ${err.message}</span>`;
+            }
+        };
+    </script>
+</body>
+</html>
